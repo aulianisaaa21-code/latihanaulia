@@ -1,0 +1,608 @@
+index.<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Game Balok - Dodger</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --panel:#0b1220;
+      --accent:#7dd3fc;
+      --danger:#fb7185;
+      --muted:#94a3b8;
+      --glass: rgba(255,255,255,0.03);
+    }
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #071029 0%, #0e1b2a 100%);
+      color:#e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    .wrap{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      box-sizing:border-box;
+      gap:20px;
+      flex-direction:column;
+    }
+
+    .card{
+      width:100%;
+      max-width:720px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;
+      box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+      padding:18px;
+      box-sizing:border-box;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    header.title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+    header h1{
+      font-size:20px;
+      margin:0;
+      letter-spacing:0.2px;
+    }
+    .meta{
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    /* canvas container */
+    .game-area{
+      display:grid;
+      grid-template-columns: 1fr 220px;
+      gap:14px;
+    }
+
+    @media (max-width:760px){
+      .game-area{ grid-template-columns: 1fr; }
+      .side { order:2; }
+    }
+
+    .canvas-wrap{
+      background:var(--panel);
+      border-radius:8px;
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:center;
+    }
+
+    canvas{
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.02));
+      border-radius:6px;
+      width:100%;
+      height:auto;
+      max-height:560px;
+      touch-action: none;
+      display:block;
+    }
+
+    .controls {
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      align-items:center;
+      width:100%;
+    }
+
+    .btn {
+      background:var(--glass);
+      border:1px solid rgba(255,255,255,0.04);
+      padding:8px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      color:var(--accent);
+      font-weight:600;
+      font-size:14px;
+      user-select:none;
+    }
+    .btn.secondary { color:var(--muted); background:transparent; border:1px solid rgba(255,255,255,0.02); }
+    .btn:active{ transform:translateY(1px); }
+
+    .side{
+      padding:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+      border-radius:8px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .stat{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:10px;
+      border-radius:8px;
+      background: rgba(255,255,255,0.01);
+      font-size:14px;
+    }
+
+    .hint{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.4;
+    }
+
+    .touch-controls{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      margin-top:6px;
+    }
+    .touch-btn{
+      min-width:60px;
+      padding:10px;
+      border-radius:8px;
+      background: rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.03);
+      color:var(--muted);
+      font-weight:700;
+      user-select:none;
+      touch-action: manipulation;
+    }
+
+    /* overlay when game over */
+    .overlay{
+      position: absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+    }
+
+    .centered{
+      text-align:center;
+    }
+
+    .danger{
+      color:var(--danger);
+    }
+
+    footer.foot{
+      margin-top:12px;
+      font-size:12px;
+      color:var(--muted);
+      text-align:center;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="application" aria-label="Game Balok - Dodger">
+      <header class="title">
+        <div>
+          <h1>Game Balok — Dodger</h1>
+          <div class="meta">Gerakkan balok, hindari balok jatuh. Keyboard / Sentuh didukung.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="best" class="meta">Best: 0</div>
+        </div>
+      </header>
+
+      <div class="game-area">
+        <div class="canvas-wrap" style="position:relative;">
+          <canvas id="gameCanvas" width="600" height="420" aria-label="Canvas permainan"></canvas>
+          <!-- overlay area for messages -->
+          <div id="overlay" class="overlay" aria-hidden="true"></div>
+
+          <div class="controls" style="margin-top:8px;">
+            <button id="startBtn" class="btn">Mulai</button>
+            <button id="pauseBtn" class="btn secondary">Jeda</button>
+            <button id="restartBtn" class="btn secondary">Restart</button>
+          </div>
+
+          <div style="display:flex;justify-content:center;margin-top:8px;">
+            <div class="hint">Gunakan ← → atau tombol sentuh untuk bergerak. Atau ketuk di sebelah kiri/kanan layar.</div>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="stat"><div>Skor</div><div id="score">0</div></div>
+          <div class="stat"><div>Level</div><div id="level">1</div></div>
+          <div class="stat"><div>Kecepatan</div><div id="speed">Normal</div></div>
+
+          <div>
+            <div style="font-weight:700;margin-bottom:6px;">Petunjuk singkat</div>
+            <div class="hint">
+              - Pindahkan balok (player) ke kiri/kanan.<br>
+              - Hindari balok yang jatuh; tiap berhasil bertahan menambah score.<br>
+              - Level naik setiap 15 poin, kecepatan naik.
+            </div>
+          </div>
+
+          <div style="margin-top:6px;">
+            <div style="font-weight:700;margin-bottom:6px;">Kontrol Sentuh</div>
+            <div class="touch-controls">
+              <button id="touchLeft" class="touch-btn">◀</button>
+              <button id="touchStop" class="touch-btn">●</button>
+              <button id="touchRight" class="touch-btn">▶</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="foot">Dibuat sederhana — cocok untuk latihan pengajaran & eksperimen.</footer>
+    </div>
+  </div>
+
+<script>
+/*
+  Game Balok - Dodger
+  Single-file HTML/CSS/JS
+  - Canvas-based
+  - Player: rectangle at bottom moved by keyboard/touch
+  - Enemies: falling blocks, spawn rate increases with level
+  - Score & best score saved to localStorage
+*/
+
+(() => {
+  // Canvas & rendering
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // UI elements
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const overlay = document.getElementById('overlay');
+  const scoreEl = document.getElementById('score');
+  const levelEl = document.getElementById('level');
+  const bestEl = document.getElementById('best');
+  const speedEl = document.getElementById('speed');
+
+  const touchLeft = document.getElementById('touchLeft');
+  const touchRight = document.getElementById('touchRight');
+  const touchStop = document.getElementById('touchStop');
+
+  // Game state
+  let width = canvas.width = canvas.clientWidth;
+  let height = canvas.height = canvas.clientHeight;
+  let animationId = null;
+  let running = false;
+  let paused = false;
+
+  // Player
+  const player = {
+    w: Math.max(48, Math.round(width * 0.12)),
+    h: 16,
+    x: 0,
+    y: 0,
+    speed: 5,
+    vx: 0,
+    color: '#7dd3fc'
+  };
+
+  // Enemy blocks
+  const enemies = [];
+  let spawnTimer = 0;
+  let spawnInterval = 80; // frames
+  let tick = 0;
+
+  // Score & level
+  let score = 0;
+  let level = 1;
+  const bestKey = 'game-balok-best';
+  let bestScore = parseInt(localStorage.getItem(bestKey) || '0', 10);
+
+  bestEl.textContent = `Best: ${bestScore}`;
+
+  // Helpers
+  function resizeCanvas() {
+    // keep canvas resolution in sync if responsive
+    const ratio = window.devicePixelRatio || 1;
+    width = canvas.clientWidth;
+    height = Math.round(width * 0.7);
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    canvas.style.height = height + 'px';
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+    // update player width proportionally
+    player.w = Math.max(48, Math.round(width * 0.12));
+    player.h = Math.max(12, Math.round(width * 0.03));
+    player.y = height - player.h - 10;
+    if (player.x + player.w > width) player.x = width - player.w - 10;
+  }
+
+  // Initialize
+  function resetGame() {
+    enemies.length = 0;
+    spawnTimer = 0;
+    spawnInterval = 80;
+    tick = 0;
+    score = 0;
+    level = 1;
+    player.x = Math.round(width / 2 - player.w / 2);
+    player.vx = 0;
+    running = false;
+    paused = false;
+    scoreEl.textContent = score;
+    levelEl.textContent = level;
+    speedEl.textContent = 'Normal';
+    overlay.innerHTML = '';
+    overlay.style.pointerEvents = 'none';
+  }
+
+  function startGame() {
+    if (running) return;
+    running = true;
+    paused = false;
+    overlay.innerHTML = '';
+    overlay.style.pointerEvents = 'none';
+    lastTime = performance.now();
+    loop();
+  }
+
+  function pauseToggle() {
+    if (!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Lanjut' : 'Jeda';
+    if (!paused) {
+      lastTime = performance.now();
+      loop();
+    } else {
+      cancelAnimationFrame(animationId);
+    }
+  }
+
+  function gameOver() {
+    running = false;
+    cancelAnimationFrame(animationId);
+    overlay.style.pointerEvents = 'auto';
+    overlay.innerHTML = `
+      <div class="centered" style="background:rgba(0,0,0,0.5);padding:18px;border-radius:10px;">
+        <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;">Game Over</div>
+        <div style="color:var(--muted);margin-bottom:10px;">Skor: <strong style="color:#fff">${score}</strong></div>
+        <button id="overlayRestart" class="btn">Main Lagi</button>
+      </div>
+    `;
+    // update best
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem(bestKey, String(bestScore));
+      bestEl.textContent = `Best: ${bestScore}`;
+    }
+
+    // attach overlay restart button listener
+    document.getElementById('overlayRestart').addEventListener('click', () => {
+      resetGame();
+      startGame();
+    });
+  }
+
+  // Spawn enemy
+  function spawnEnemy() {
+    const ew = Math.max(20, Math.round(player.w * (0.4 + Math.random() * 1.2)));
+    const ex = Math.round(Math.random() * (width - ew));
+    const speed = 1.2 + Math.random() * (0.6 + level * 0.25);
+    const color = `hsl(${Math.round(200 - level*6 + Math.random()*60)}, 80%, 60%)`;
+    enemies.push({
+      x: ex,
+      y: -20,
+      w: ew,
+      h: Math.max(12, Math.round(ew * (0.22 + Math.random()*0.28))),
+      vy: speed,
+      color
+    });
+  }
+
+  // Update logic
+  function update() {
+    tick++;
+    // spawn logic (speed up with level)
+    spawnTimer++;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnEnemy();
+    }
+
+    // move player by velocity
+    player.x += player.vx;
+    if (player.x < 8) player.x = 8;
+    if (player.x + player.w > width - 8) player.x = width - player.w - 8;
+
+    // update enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      e.y += e.vy;
+      // collision detection (AABB)
+      if (e.x < player.x + player.w &&
+          e.x + e.w > player.x &&
+          e.y < player.y + player.h &&
+          e.y + e.h > player.y) {
+        // collision
+        gameOver();
+        return;
+      }
+      // passed bottom
+      if (e.y > height + 30) {
+        enemies.splice(i, 1);
+        score++;
+        scoreEl.textContent = score;
+        // level up every 15 points
+        const newLevel = Math.floor(score / 15) + 1;
+        if (newLevel > level) {
+          level = newLevel;
+          levelEl.textContent = level;
+          // speed up spawn and enemies
+          spawnInterval = Math.max(28, Math.round(spawnInterval * 0.88));
+          enemies.forEach(en => { en.vy *= 1.05; });
+          speedEl.textContent = (level <= 3) ? 'Normal' : (level <= 6 ? 'Cepat' : 'Sangat Cepat');
+        }
+      }
+    }
+  }
+
+  // Draw
+  function draw() {
+    // background
+    ctx.fillStyle = '#071029';
+    ctx.fillRect(0,0,width,height);
+
+    // grid subtle
+    ctx.globalAlpha = 0.06;
+    for (let gx = 0; gx < width; gx += 24) {
+      ctx.fillRect(gx, 0, 1, height);
+    }
+    ctx.globalAlpha = 1;
+
+    // draw player (rounded rect)
+    roundRect(ctx, player.x, player.y, player.w, player.h, 6, true, false, player.color);
+
+    // draw enemies
+    enemies.forEach(e => {
+      roundRect(ctx, e.x, e.y, e.w, e.h, 6, true, false, e.color);
+      // shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(e.x, e.y + e.h - 4, e.w, 4);
+    });
+
+    // top HUD
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(8,8,width-16,36);
+    ctx.fillStyle = '#dff6ff';
+    ctx.font = '14px Inter, system-ui, -apple-system';
+    ctx.fillText(`Skor: ${score}`, 18, 32);
+    ctx.fillText(`Level: ${level}`, 120, 32);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`Best: ${bestScore}`, 200, 32);
+  }
+
+  // utility: rounded rect
+  function roundRect(ctx, x, y, w, h, r, fill=true, stroke=false, fillColor='#fff') {
+    const radius = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+    if (fill) {
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+    }
+    if (stroke) {
+      ctx.stroke();
+    }
+  }
+
+  // Game loop
+  let lastTime = 0;
+  function loop(now) {
+    if (!running || paused) return;
+    animationId = requestAnimationFrame(loop);
+    const dt = now - lastTime;
+    lastTime = now;
+
+    // we can limit update frequency if needed, but simple game: update per frame
+    update();
+    draw();
+  }
+
+  // Input handling
+  const keys = {
+    left:false, right:false
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { keys.left = true; player.vx = -player.speed; }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { keys.right = true; player.vx = player.speed; }
+    if (e.key === ' '){ // space to pause
+      pauseToggle();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { keys.left = false; player.vx = keys.right ? player.speed : 0; }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { keys.right = false; player.vx = keys.left ? -player.speed : 0; }
+  });
+
+  // Touch & pointer controls (tap left/right)
+  canvas.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    if (x < rect.width / 2) {
+      player.vx = -player.speed;
+    } else {
+      player.vx = player.speed;
+    }
+  });
+  canvas.addEventListener('pointerup', (ev) => {
+    player.vx = 0;
+  });
+  canvas.addEventListener('pointercancel', () => { player.vx = 0; });
+
+  // Touch buttons
+  touchLeft.addEventListener('pointerdown', () => { player.vx = -player.speed; });
+  touchLeft.addEventListener('pointerup', () => { player.vx = 0; });
+  touchLeft.addEventListener('pointercancel', () => { player.vx = 0; });
+
+  touchRight.addEventListener('pointerdown', () => { player.vx = player.speed; });
+  touchRight.addEventListener('pointerup', () => { player.vx = 0; });
+  touchRight.addEventListener('pointercancel', () => { player.vx = 0; });
+
+  touchStop.addEventListener('click', () => { player.vx = 0; });
+
+  // Buttons
+  startBtn.addEventListener('click', () => {
+    startGame();
+  });
+  pauseBtn.addEventListener('click', () => {
+    if (!running) return;
+    pauseToggle();
+  });
+  restartBtn.addEventListener('click', () => {
+    resetGame();
+    startGame();
+  });
+
+  // click on overlay to restart (if exists)
+  overlay.addEventListener('click', (e) => {
+    if (e.target.id === 'overlayRestart') return;
+  });
+
+  // keep canvas responsive
+  window.addEventListener('resize', () => {
+    // CSS may change size, recalc
+    canvas.style.width = '100%';
+    resizeCanvas();
+    draw();
+  });
+
+  // initial setup
+  resizeCanvas();
+  resetGame();
+  // initial draw
+  draw();
+
+  // expose some controls for convenience (optional)
+  window.__gameBalok = {
+    start: startGame,
+    pause: pauseToggle,
+    reset: resetGame,
+    getState: () => ({score, level, running})
+  };
+})();
+</script>
+</body>
+  </html>
